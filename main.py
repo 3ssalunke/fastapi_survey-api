@@ -2,6 +2,7 @@ import fastapi as _fastapi
 import uvicorn
 from starlette.middleware.cors import CORSMiddleware
 from starlette.status import HTTP_200_OK
+from fastapi.staticfiles import StaticFiles
 import sqlalchemy.orm as _orm
 
 import services as _services
@@ -14,6 +15,10 @@ app.add_middleware(CORSMiddleware,
                    allow_methods=['*'],
                    allow_headers=['*']
                    )
+
+
+app.mount(
+    "/static/images", StaticFiles(directory="images"), name="static")
 
 
 @app.get("/api/status", status_code=HTTP_200_OK)
@@ -65,6 +70,14 @@ async def get_survey(survey_id: int, request: _fastapi.Request, db: _orm.Session
     user = _services.get_user_from_token(request, db)
     survey = _services.get_survey(survey_id, user.id, db)
     return {"survey": survey.dict()}
+
+
+@app.get("/api/survey")
+async def get_surveys(request: _fastapi.Request, db: _orm.Session = _fastapi.Depends(_services.get_db)):
+    user = _services.get_user_from_token(request, db)
+    surveys = list(map(lambda x: x.dict(), _services.get_surveys(user.id, db)))
+
+    return {"surveys": surveys}
 
 
 @app.put("/api/survey")

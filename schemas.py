@@ -1,5 +1,6 @@
 import datetime as _dt
 import pydantic as _pydantic
+import typing as _typing
 
 
 class _UserBase(_pydantic.BaseModel):
@@ -34,6 +35,36 @@ class User(_UserBase):
         orm_mode = True
 
 
+class _QuestionBase(_pydantic.BaseModel):
+    type: str
+    question: str
+    description: str
+    data: _typing.Any
+
+
+class QuestionCreate(_QuestionBase):
+    class Config:
+        orm_mode = True
+
+
+class QuestionUpdate(_QuestionBase):
+    id: int
+    survey_id: int
+
+    class Config:
+        orm_mode = True
+
+
+class Question(_QuestionBase):
+    id: int
+    survey_id: int
+    created_at: _dt.datetime
+    updated_at: _dt.datetime
+
+    class Config:
+        orm_mode = True
+
+
 class _SurveyBase(_pydantic.BaseModel):
     title: str
     image: str
@@ -44,6 +75,7 @@ class _SurveyBase(_pydantic.BaseModel):
 
 class SurveyCreate(_SurveyBase):
     expire_date: str
+    questions: _typing.List[QuestionCreate]
 
     class Config:
         orm_mode = True
@@ -52,6 +84,7 @@ class SurveyCreate(_SurveyBase):
 class SurveyUpdate(_SurveyBase):
     id: int
     expire_date: str
+    questions: _typing.List[QuestionUpdate]
 
     class Config:
         orm_mode = True
@@ -61,6 +94,7 @@ class Survey(_SurveyBase):
     id: int
     slug: str
     user_id: int
+    questions: _typing.List[Question]
     created_at: _dt.datetime
     updated_at: _dt.datetime
 

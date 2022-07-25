@@ -4,6 +4,7 @@ import jwt as _jwt
 import fastapi as _fastapi
 import datetime as _dt
 import slugify as _slugify
+import json as _json
 
 import database as _database
 import schemas as _schemas
@@ -80,13 +81,22 @@ def get_user_from_token(request: _fastapi.Request,  db: _orm.Session):
 def create_survey(survey: _schemas.SurveyCreate, user_id: int, db: _orm.session):
     slug = _slugify.slugify(survey.title)
     image_path = _utils.save_image(survey.image, slug)
+    expire_date = _dt.datetime.strptime(
+        survey.expire_date, '%Y-%m-%d')
 
-    survey_dict = {**survey.dict(), "image": image_path, "slug": slug, "expire_date": _dt.datetime.strptime(
-        survey.expire_date, '%Y-%m-%d')}
-    survey_obj = _models.Survey(**survey_dict, user_id=user_id)
+    survey_obj = _models.Survey(title=survey.title, slug=slug, image=image_path,
+                                description=survey.description, status=survey.status, expire_date=expire_date, user_id=user_id)
     db.add(survey_obj)
     db.commit()
     db.refresh(survey_obj)
+
+    if len(survey.questions) != 0:
+        for question in survey.questions:
+            question_obj = _models.SurveyQuestion(type=question.type, question=question.question,
+                                                  description=question.description, data=_json.dumps(question.data), survey_id=survey_obj.id)
+            db.add(question_obj)
+            db.commit()
+
     return _schemas.Survey.from_orm(survey_obj)
 
 
@@ -99,6 +109,13 @@ def get_survey(survey_id: int, user_id: int, db: _orm.session):
             status_code=403, detail="You are not authorized to access this survey")
 
     return _schemas.Survey.from_orm(survey_obj)
+
+
+def get_surveys(user_id: int, db: _orm.session):
+    surveys_list = db.query(_models.Survey).filter(
+        _models.Survey.user_id == user_id).all()
+
+    return list(map(_schemas.Survey.from_orm, surveys_list))
 
 
 def update_survey(survey: _schemas.SurveyUpdate, user_id: int, db: _orm.session):
@@ -114,7 +131,8 @@ def update_survey(survey: _schemas.SurveyUpdate, user_id: int, db: _orm.session)
             status_code=403, detail="You are not authorized to access this survey")
 
     try:
-        _utils.delete_image(survey_obj.image)
+        if survey_obj.image != "no_image":
+            _utils.delete_image(survey_obj.image)
     except:
         raise _fastapi.HTTPException(
             status_code=500, detail="Internal image handling error")
@@ -134,6 +152,7 @@ def update_survey(survey: _schemas.SurveyUpdate, user_id: int, db: _orm.session)
     db.add(survey_obj)
     db.commit()
     db.refresh(survey_obj)
+
     return _schemas.Survey.from_orm(survey_obj)
 
 
@@ -148,6 +167,13 @@ def delete_survey(survey_id: int, user_id: int, db: _orm.session):
     if not survey_obj.user.id == user_id:
         raise _fastapi.HTTPException(
             status_code=403, detail="You are not authorized to access this survey")
+
+    try:
+        if survey_obj.image != "no_image":
+            _utils.delete_image(survey_obj.image)
+    except:
+        raise _fastapi.HTTPException(
+            status_code=500, detail="Internal image handling error")
 
     db.delete(survey_obj)
     db.commit()
